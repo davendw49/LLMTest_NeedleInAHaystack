@@ -1,10 +1,11 @@
 from unittest.mock import patch, MagicMock, call, ANY
 
 from needlehaystack.evaluators import OpenAIEvaluator
+from utils import get_openai_key
 
 QUESTION_ASKED = "What is the color of the sky?"
 QUESTION_ANSWER = "Sky is blue"
-API_KEY = "abc"
+API_KEY = get_openai_key()
 SCORE = 123
 TEMPERATURE = 0
 MODEL = "gpt-3.5-turbo-0125"
