@@ -1,27 +1,44 @@
+import os,sys
+os.chdir(sys.path[0])
+
 from dataclasses import dataclass, field
 from typing import Optional
 
 from dotenv import load_dotenv
 from jsonargparse import CLI
 
-from . import LLMNeedleHaystackTester, LLMMultiNeedleHaystackTester
-from .evaluators import Evaluator, LangSmithEvaluator, OpenAIEvaluator
-from .providers import Anthropic, ModelProvider, OpenAI, Cohere
+from needlehaystack import LLMNeedleHaystackTester, LLMMultiNeedleHaystackTester, LLMNeedleHaystackTester_unasync
+from needlehaystack.evaluators import Evaluator, LangSmithEvaluator, OpenAIEvaluator
+from needlehaystack.providers import Anthropic, ModelProvider, OpenAI, Cohere, HFmodel
+
+from utils import get_openai_key
+
+import os
+import time
+
+API_KEY = get_openai_key()
+
+os.environ['NIAH_MODEL_API_KEY'] = API_KEY
+os.system('export NIAH_MODEL_API_KEY')
+os.environ['NIAH_EVALUATOR_API_KEY'] = API_KEY
+os.system('export NIAH_EVALUATOR_API_KEY')
+
+time.sleep(2)
 
 load_dotenv()
 
 @dataclass
 class CommandArgs():
-    provider: str = "openai"
+    provider: str = "huggingface"
     evaluator: str = "openai"
-    model_name: str = "gpt-3.5-turbo-0125"
+    model_name: str = "microsoft/Phi-3-mini-128k-instruct"
     evaluator_model_name: Optional[str] = "gpt-3.5-turbo-0125"
     needle: Optional[str] = "\nThe best thing to do in San Francisco is eat a sandwich and sit in Dolores Park on a sunny day.\n"
     haystack_dir: Optional[str] = "PaulGrahamEssays"
     retrieval_question: Optional[str] = "What is the best thing to do in San Francisco?"
     results_version: Optional[int] = 1
     context_lengths_min: Optional[int] = 1000
-    context_lengths_max: Optional[int] = 16000
+    context_lengths_max: Optional[int] = 131072
     context_lengths_num_intervals: Optional[int] = 35
     context_lengths: Optional[list[int]] = None
     document_depth_percent_min: Optional[int] = 0
@@ -65,6 +82,8 @@ def get_model_to_test(args: CommandArgs) -> ModelProvider:
             return Anthropic(model_name=args.model_name)
         case "cohere":
             return Cohere(model_name=args.model_name)
+        case "huggingface":
+            return HFmodel(model_name=args.model_name)
         case _:
             raise ValueError(f"Invalid provider: {args.provider}")
 
@@ -102,12 +121,17 @@ def main():
     args.model_to_test = get_model_to_test(args)
     args.evaluator = get_evaluator(args)
     
-    if args.multi_needle == True:
-        print("Testing multi-needle")
-        tester = LLMMultiNeedleHaystackTester(**args.__dict__)
-    else: 
-        print("Testing single-needle")
-        tester = LLMNeedleHaystackTester(**args.__dict__)
+
+    if args.provider == "huggingface":
+        print("Testing CasualLM")
+        tester = LLMNeedleHaystackTester_unasync(**args.__dict__)
+    else:
+        if args.multi_needle == True:
+            print("Testing multi-needle")
+            tester = LLMMultiNeedleHaystackTester(**args.__dict__)
+        else: 
+            print("Testing single-needle")
+            tester = LLMNeedleHaystackTester(**args.__dict__)
     tester.start_test()
 
 if __name__ == "__main__":

@@ -16,7 +16,7 @@ class OpenAIEvaluator(Evaluator):
                 Only respond with a numberical score"""}
 
     def __init__(self,
-                 model_name: str = "gpt-3.5-turbo-0125",
+                 model_name: str = "gpt-3.5-turbo-1106",
                  model_kwargs: dict = DEFAULT_MODEL_KWARGS,
                  true_answer: str = None,
                  question_asked: str = None,):
@@ -51,7 +51,6 @@ class OpenAIEvaluator(Evaluator):
             criteria=self.CRITERIA,
             llm=self.evaluator,
         )
-
         eval_result = evaluator.evaluate_strings(
             # The models response
             prediction=response,

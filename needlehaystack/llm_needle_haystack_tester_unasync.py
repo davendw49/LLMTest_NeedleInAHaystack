@@ -1,4 +1,3 @@
-import asyncio
 import glob
 import json
 import os
@@ -9,10 +8,9 @@ import numpy as np
 from .evaluators import Evaluator
 from .providers import ModelProvider
 
-from asyncio import Semaphore
 from datetime import datetime, timezone
 
-class LLMNeedleHaystackTester:
+class LLMNeedleHaystackTester_unasync:
     """
     This class is used to test the LLM Needle Haystack.
     """
@@ -118,24 +116,21 @@ class LLMNeedleHaystackTester:
     def sigmoid(self, x):
         return 1 / (1 + np.exp(-x))
     
-    async def bound_evaluate_and_log(self, sem, *args):
-        async with sem:
-            await self.evaluate_and_log(*args)
+    def bound_evaluate_and_log(self, *args):
+        self.evaluate_and_log(*args)
 
-    async def run_test(self):
-        sem = Semaphore(self.num_concurrent_requests)
-
+    def run_test(self):
         # Run through each iteration of context_lengths and depths
         tasks = []
         for context_length in self.context_lengths:
             for depth_percent in self.document_depth_percents:
-                task = self.bound_evaluate_and_log(sem, context_length, depth_percent)
-                tasks.append(task)
+                try:
+                    task = self.bound_evaluate_and_log(context_length, depth_percent)
+                    tasks.append(task)
+                except:
+                    print(f"[ERROR] with context_length={context_length}, depth_percent={depth_percent}")
 
-        # Wait for all tasks to complete
-        await asyncio.gather(*tasks)
-
-    async def evaluate_and_log(self, context_length, depth_percent):
+    def evaluate_and_log(self, context_length, depth_percent):
         # Checks to see if you've already checked a length/percent/version.
         # This helps if the program stop running and you want to restart later
         if self.save_results:
@@ -143,7 +138,7 @@ class LLMNeedleHaystackTester:
                 return
 
         # Go generate the required length context and place your needle statement in
-        context = await self.generate_context(context_length, depth_percent)
+        context = self.generate_context(context_length, depth_percent)
 
         # Prepare your message to send to the model you're going to evaluate
         prompt = self.model_to_test.generate_prompt(context, self.retrieval_question)
@@ -151,7 +146,7 @@ class LLMNeedleHaystackTester:
         test_start_time = time.time()
 
         # Go see if the model can answer the question to pull out your random fact
-        response = await self.model_to_test.evaluate_model(prompt)
+        response = self.model_to_test.evaluate_model(prompt)
 
         test_end_time = time.time()
         test_elapsed_time = test_end_time - test_start_time
@@ -190,8 +185,8 @@ class LLMNeedleHaystackTester:
             # Save the context to file for retesting
             if not os.path.exists('contexts'):
                 os.makedirs('contexts')
-
-            with open(f'contexts/{context_file_location}_context.txt', 'w') as f:
+            filename = context_file_location.split('/')[1]
+            with open(f'contexts/Phi-3-128k/{filename}_context.txt', 'w') as f:
                 f.write(context)
             
         if self.save_results:
@@ -200,11 +195,12 @@ class LLMNeedleHaystackTester:
                 os.makedirs('results')
 
             # Save the result to file for retesting
-            with open(f'results/{context_file_location}_results.json', 'w') as f:
+            filename = context_file_location.split('/')[1]
+            with open(f'results/Phi-3-128k/{filename}_results.json', 'w') as f:
                 json.dump(results, f)
 
         if self.seconds_to_sleep_between_completions:
-            await asyncio.sleep(self.seconds_to_sleep_between_completions)
+            time.sleep(1)
 
     def result_exists(self, context_length, depth_percent):
         """
@@ -227,7 +223,7 @@ class LLMNeedleHaystackTester:
                         return True
         return False
 
-    async def generate_context(self, context_length, depth_percent):
+    def generate_context(self, context_length, depth_percent):
         # Load up tiktoken so we navigate tokens more easily
 
         # Get your haystack dir files loaded into a string
@@ -314,4 +310,4 @@ class LLMNeedleHaystackTester:
         if self.print_ongoing_status:
             self.print_start_test_summary()
         # for hf model we do not need asyncio
-        asyncio.run(self.run_test())
+        self.run_test()
